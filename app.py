@@ -111,8 +111,8 @@ def create_user():
 @app.route('/login', methods=['POST'])
 def login():
 
-    if not request.json.get('email') or not request.json.get('password') or not request.json.get('userId'):
-        # returns 401 if any email or / and password is missing
+    if not request.json.get('password') or not request.json.get('userId'):
+        # returns 401 if any userId or / and password is missing
         return make_response(
             'Could not verify',
             401,
@@ -136,7 +136,7 @@ def login():
         # generates the JWT Token
         token = jwt.encode({
             'userId': item.get('userId').get('S'),
-            'exp': datetime.datetime.now() + datetime.timedelta(minutes=500)
+            'exp': datetime.datetime.now() + datetime.timedelta(minutes=30)
         }, app.config['SECRET_KEY'], algorithm='HS256')
 
         return make_response(jsonify({'token': token}), 201)
