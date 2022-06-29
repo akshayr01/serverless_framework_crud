@@ -6,9 +6,8 @@ import boto3
 from flask import Flask, jsonify, make_response, request
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
-
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
+app.config['SECRET_KEY'] = os.environ['SECRET_KEY']  # "mysecret123"
 
 
 dynamodb_client = boto3.client('dynamodb')
@@ -19,9 +18,12 @@ if os.environ.get('IS_OFFLINE'):
     )
 USERS_TABLE = os.environ['USERS_TABLE']
 # decorator for verifying the JWT
+
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+
         token = None
         # jwt is passed in the request header
         if 'x-access-token' in request.headers:
@@ -33,36 +35,41 @@ def token_required(f):
         try:
             # decoding the payload to fetch the stored details
             data = jwt.decode(
-                token, app.config['SECRET_KEY'], algorithm='HS256')
+                token, app.config['SECRET_KEY'], algorithms=['HS256'])
             result = dynamodb_client.get_item(
                 TableName=USERS_TABLE, Key={'userId': {'S': data['userId']}}
             )
-            print(result)
-            item = result.get('Item')
-            print(item, "ITEM")
-        except:
+
+        except Exception as e:
+
             return jsonify({
                 'message': 'Token is invalid !!'
             }), 401
         # returns the current logged in users contex to the routes
-        return f(item.get('userId').get('S'), *args, **kwargs)
+        return f(data['userId'])
 
     return decorated
 
 
 USERS_TABLE = os.environ['USERS_TABLE']
 
+# Route for deleting user based on userid
+
 
 @app.route('/delete_user/<string:user_id>')
 @token_required
 def delete_user(user_id):
-    result = dynamodb_client.delete_item(
-        TableName=USERS_TABLE, Key={'userId':  user_id}
+
+    # table = dynamodb_client.Table(USERS_TABLE)
+    dynamodb_client.delete_item(
+        TableName=USERS_TABLE, Key={'userId':  {"S": (user_id)}}
     )
 
     return jsonify(
         {'message': 'User successfully deleted'}
-    ), 200
+    )
+
+# Route for getting user based on userid
 
 
 @app.route('/users/<string:user_id>')
@@ -80,6 +87,8 @@ def get_user(user_id):
             'S'), 'email': item.get('email').get('S')}
     )
 
+# Route for creating user (Not used)
+
 
 @app.route('/users', methods=['POST'])
 @token_required
@@ -95,12 +104,12 @@ def create_user():
     )
 
     return jsonify({'userId': user_id, 'name': name})
-# route for logging user in
+
+# Route for logging user in
 
 
 @app.route('/login', methods=['POST'])
 def login():
-    # creates dictionary of form data
 
     if not request.json.get('email') or not request.json.get('password') or not request.json.get('userId'):
         # returns 401 if any email or / and password is missing
@@ -137,6 +146,8 @@ def login():
         403,
         {'WWW-Authenticate': 'Basic realm ="Wrong Password !!"'}
     )
+
+# Route for signing up
 
 
 @app.route('/signup', methods=['POST'])
